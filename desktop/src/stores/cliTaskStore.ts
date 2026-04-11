@@ -36,7 +36,7 @@ type CLITaskStore = {
 export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
   sessionId: null,
   tasks: [],
-  expanded: true,
+  expanded: false,
   completedAndDismissed: false,
 
   fetchSessionTasks: async (sessionId) => {
@@ -89,7 +89,7 @@ export const useCLITaskStore = create<CLITaskStore>((set, get) => ({
   },
 
   clearTasks: () => {
-    set({ sessionId: null, tasks: [], completedAndDismissed: false })
+    set({ sessionId: null, tasks: [], completedAndDismissed: false, expanded: false })
   },
 
   toggleExpanded: () => {
