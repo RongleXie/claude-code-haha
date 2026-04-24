@@ -569,6 +569,9 @@ export class ConversationService {
       // should come from Desktop-managed config or inherited launch env, not
       // be reintroduced from the repo's .env file.
       CC_HAHA_SKIP_DOTENV: '1',
+      ...(explicitProviderEnv
+        ? { CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST: '1' }
+        : {}),
       // "官方" 模式 (cc-haha/settings.json 没 provider env) 下,把 CLI 标记为
       // managed-OAuth,让它忽略外部 ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN
       // 残留、只走用户 /login 的 OAuth token。自定义 provider 模式绝不能设,

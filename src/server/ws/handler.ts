@@ -54,6 +54,8 @@ const runtimeOverrides = new Map<string, {
   modelId: string
 }>()
 
+const runtimeTransitionPromises = new Map<string, Promise<void>>()
+
 export function getSlashCommands(sessionId: string): Array<{ name: string; description: string }> {
   return sessionSlashCommands.get(sessionId) || []
 }
@@ -201,6 +203,23 @@ async function handleUserMessage(
 
   // Send thinking status
   sendMessage(ws, { type: 'status', state: 'thinking', verb: 'Thinking' })
+
+  const pendingRuntimeTransition = runtimeTransitionPromises.get(sessionId)
+  if (pendingRuntimeTransition) {
+    try {
+      await pendingRuntimeTransition
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.error(`[WS] Runtime transition failed before handling user message for ${sessionId}: ${errMsg}`)
+      sendMessage(ws, {
+        type: 'error',
+        message: `Failed to switch provider/model: ${errMsg}`,
+        code: 'CLI_RESTART_FAILED',
+      })
+      sendMessage(ws, { type: 'status', state: 'idle' })
+      return
+    }
+  }
 
   // 启动 CLI 子进程（如果还没有）
   if (!conversationService.hasSession(sessionId)) {
@@ -374,7 +393,9 @@ async function handleSetRuntimeConfig(
     return
   }
 
-  await restartSessionWithRuntimeConfig(ws, sessionId)
+  await enqueueRuntimeTransition(sessionId, () =>
+    restartSessionWithRuntimeConfig(ws, sessionId),
+  )
 }
 
 async function restartSessionWithPermissionMode(
@@ -553,6 +574,7 @@ function cleanupSessionRuntimeState(sessionId: string) {
   sessionSlashCommands.delete(sessionId)
   sessionTitleState.delete(sessionId)
   runtimeOverrides.delete(sessionId)
+  runtimeTransitionPromises.delete(sessionId)
 }
 
 function translateCliMessage(cliMsg: any, sessionId: string): ServerMessage[] {
@@ -991,6 +1013,23 @@ async function getRuntimeSettings(sessionId?: string): Promise<{
     model,
     effort,
   }
+}
+
+function enqueueRuntimeTransition(
+  sessionId: string,
+  transition: () => Promise<void>,
+): Promise<void> {
+  const previous = runtimeTransitionPromises.get(sessionId) ?? Promise.resolve()
+  const next = previous
+    .catch(() => {})
+    .then(transition)
+    .finally(() => {
+      if (runtimeTransitionPromises.get(sessionId) === next) {
+        runtimeTransitionPromises.delete(sessionId)
+      }
+    })
+  runtimeTransitionPromises.set(sessionId, next)
+  return next
 }
 
 /**

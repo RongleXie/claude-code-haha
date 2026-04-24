@@ -718,4 +718,139 @@ describe('WebSocket Chat Integration', () => {
       conversationService.stopSession(sessionId)
     }
   }, 20_000)
+
+  it('should wait for an in-flight runtime restart before sending the next user turn', async () => {
+    const providerService = new ProviderService()
+    const providerA = await providerService.addProvider({
+      presetId: 'custom',
+      name: 'Provider Restart A',
+      apiKey: 'key-a',
+      baseUrl: 'http://127.0.0.1:1/anthropic',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'restart-a-main',
+        haiku: 'restart-a-haiku',
+        sonnet: 'restart-a-sonnet',
+        opus: 'restart-a-opus',
+      },
+    })
+    const providerB = await providerService.addProvider({
+      presetId: 'custom',
+      name: 'Provider Restart B',
+      apiKey: 'key-b',
+      baseUrl: 'http://127.0.0.1:1/anthropic',
+      apiFormat: 'anthropic',
+      models: {
+        main: 'restart-b-main',
+        haiku: 'restart-b-haiku',
+        sonnet: 'restart-b-sonnet',
+        opus: 'restart-b-opus',
+      },
+    })
+
+    const createRes = await fetch(`${baseUrl}/api/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workDir: process.cwd() }),
+    })
+    expect(createRes.status).toBe(201)
+    const { sessionId } = await createRes.json() as { sessionId: string }
+
+    const originalStartSession = conversationService.startSession.bind(conversationService)
+    const startCalls: Array<{
+      sessionId: string
+      options: { permissionMode?: string; model?: string; effort?: string; providerId?: string | null } | undefined
+    }> = []
+
+    conversationService.startSession = (async function patchedStartSession(
+      sid: string,
+      workDir: string,
+      sdkUrl: string,
+      options?: { permissionMode?: string; model?: string; effort?: string; providerId?: string | null },
+    ) {
+      startCalls.push({ sessionId: sid, options })
+      return originalStartSession(sid, workDir, sdkUrl, options)
+    }) as typeof conversationService.startSession
+
+    try {
+      const ws = new WebSocket(`${wsUrl}/ws/${sessionId}`)
+      let phase: 'boot' | 'turn1' | 'turn2' | 'turn3' | 'done' = 'boot'
+
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          ws.close()
+          reject(new Error(`Timed out waiting for runtime restart synchronization flow for session ${sessionId}`))
+        }, 15_000)
+
+        ws.onmessage = (event) => {
+          const msg = JSON.parse(event.data as string)
+
+          if (msg.type === 'connected' && phase === 'boot') {
+            ws.send(JSON.stringify({
+              type: 'set_runtime_config',
+              providerId: providerA.id,
+              modelId: 'restart-a-sonnet',
+            }))
+            ws.send(JSON.stringify({ type: 'user_message', content: 'first turn' }))
+            phase = 'turn1'
+            return
+          }
+
+          if (msg.type === 'error') {
+            clearTimeout(timeout)
+            ws.close()
+            reject(new Error(msg.message))
+            return
+          }
+
+          if (msg.type === 'message_complete' && phase === 'turn1') {
+            ws.send(JSON.stringify({
+              type: 'set_runtime_config',
+              providerId: providerB.id,
+              modelId: 'restart-b-opus',
+            }))
+            ws.send(JSON.stringify({ type: 'user_message', content: 'second turn immediately after switch' }))
+            phase = 'turn2'
+            return
+          }
+
+          if (msg.type === 'message_complete' && phase === 'turn2') {
+            ws.send(JSON.stringify({ type: 'user_message', content: 'third turn should reuse restarted runtime' }))
+            phase = 'turn3'
+            return
+          }
+
+          if (msg.type === 'message_complete' && phase === 'turn3') {
+            clearTimeout(timeout)
+            phase = 'done'
+            ws.close()
+            resolve()
+          }
+        }
+
+        ws.onerror = () => {
+          reject(new Error(`WebSocket error for runtime restart synchronization session ${sessionId}`))
+        }
+      })
+
+      expect(startCalls).toHaveLength(2)
+      expect(startCalls[0]).toMatchObject({
+        sessionId,
+        options: {
+          providerId: providerA.id,
+          model: 'restart-a-sonnet',
+        },
+      })
+      expect(startCalls[1]).toMatchObject({
+        sessionId,
+        options: {
+          providerId: providerB.id,
+          model: 'restart-b-opus',
+        },
+      })
+    } finally {
+      conversationService.startSession = originalStartSession
+      conversationService.stopSession(sessionId)
+    }
+  }, 20_000)
 })

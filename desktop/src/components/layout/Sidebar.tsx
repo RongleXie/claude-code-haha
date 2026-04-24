@@ -232,7 +232,7 @@ export function Sidebar() {
             data-testid="sidebar-session-list-section"
             className="sidebar-section sidebar-section--visible flex flex-1 min-h-0 flex-col"
           >
-            <div className="min-h-0 flex-1 overflow-y-auto px-3">
+            <div className="sidebar-scroll-area min-h-0 flex-1 overflow-y-auto px-3">
               {error && (
                 <div className="mx-1 mt-2 rounded-[var(--radius-md)] border border-[var(--color-error)]/20 bg-[var(--color-error)]/5 px-3 py-2">
                   <div className="text-xs font-medium text-[var(--color-error)]">{t('sidebar.sessionListFailed')}</div>

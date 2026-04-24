@@ -8,6 +8,7 @@
 </defs>
 
 <g>
+
   <path d="M310 350 L510 512 L310 674" stroke="#20242E" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
   <rect x="440" y="690" width="120" height="48" rx="20" fill="#20242E"/>
   <path d="M684 298 H834 V726 H684" stroke="url(#accent)" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>

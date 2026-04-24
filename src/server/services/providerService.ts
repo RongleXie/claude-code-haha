@@ -28,6 +28,7 @@ import type {
 
 const MANAGED_ENV_KEYS = [
   'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_API_KEY',
   'ANTHROPIC_AUTH_TOKEN',
   'ANTHROPIC_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
@@ -234,7 +235,7 @@ export class ProviderService {
 
     return {
       ANTHROPIC_BASE_URL: baseUrl,
-      ANTHROPIC_AUTH_TOKEN: needsProxy ? 'proxy-managed' : provider.apiKey,
+      ANTHROPIC_API_KEY: needsProxy ? 'proxy-managed' : provider.apiKey,
       ANTHROPIC_MODEL: provider.models.main,
       ANTHROPIC_DEFAULT_HAIKU_MODEL: provider.models.haiku,
       ANTHROPIC_DEFAULT_SONNET_MODEL: provider.models.sonnet,
@@ -252,9 +253,14 @@ export class ProviderService {
   private async syncToSettings(provider: SavedProvider): Promise<void> {
     const settings = await this.readSettings()
     const existingEnv = (settings.env as Record<string, string>) || {}
+    const cleanedEnv = { ...existingEnv }
+
+    for (const key of MANAGED_ENV_KEYS) {
+      delete cleanedEnv[key]
+    }
 
     settings.env = {
-      ...existingEnv,
+      ...cleanedEnv,
       ...this.buildManagedEnv(provider),
     }
 

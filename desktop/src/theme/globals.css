@@ -636,6 +636,28 @@ button, input, textarea, select, a, [role="button"] {
 ::-webkit-scrollbar-thumb { background: var(--color-outline); border-radius: 9999px; opacity: 0.3; }
 ::-webkit-scrollbar-thumb:hover { opacity: 0.6; }
 
+.sidebar-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-outline) 72%, transparent) transparent;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-outline) 78%, transparent);
+  border-radius: 9999px;
+}
+
+.sidebar-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-outline) 92%, transparent);
+}
+
 /* Animations */
 @keyframes shimmer {
   0%, 100% { opacity: 0.4; }

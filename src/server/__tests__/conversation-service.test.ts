@@ -13,6 +13,7 @@ describe('ConversationService', () => {
   let originalModel: string | undefined
   let originalEntrypoint: string | undefined
   let originalOAuthToken: string | undefined
+  let originalProviderManagedByHost: string | undefined
 
   beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'cc-haha-conversation-service-'))
@@ -22,6 +23,7 @@ describe('ConversationService', () => {
     originalModel = process.env.ANTHROPIC_MODEL
     originalEntrypoint = process.env.CLAUDE_CODE_ENTRYPOINT
     originalOAuthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN
+    originalProviderManagedByHost = process.env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST
 
     process.env.CLAUDE_CONFIG_DIR = tmpDir
     process.env.ANTHROPIC_AUTH_TOKEN = 'test-token'
@@ -31,6 +33,7 @@ describe('ConversationService', () => {
     // Clear inherited CLAUDE_CODE_ENTRYPOINT so tests can assert whether
     // buildChildEnv injects it or not without interference from the shell env.
     delete process.env.CLAUDE_CODE_ENTRYPOINT
+    delete process.env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST
   })
 
   afterEach(async () => {
@@ -51,6 +54,9 @@ describe('ConversationService', () => {
 
     if (originalOAuthToken === undefined) delete process.env.CLAUDE_CODE_OAUTH_TOKEN
     else process.env.CLAUDE_CODE_OAUTH_TOKEN = originalOAuthToken
+
+    if (originalProviderManagedByHost === undefined) delete process.env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST
+    else process.env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST = originalProviderManagedByHost
 
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
@@ -153,8 +159,9 @@ describe('ConversationService', () => {
     })) as Record<string, string>
 
     expect(env.ANTHROPIC_BASE_URL).toBe(`http://127.0.0.1:3456/proxy/providers/${provider.id}`)
-    expect(env.ANTHROPIC_AUTH_TOKEN).toBe('proxy-managed')
+    expect(env.ANTHROPIC_API_KEY).toBe('proxy-managed')
     expect(env.ANTHROPIC_MODEL).toBe('kimi-k2.6')
+    expect(env.CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST).toBe('1')
     expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined()
   })
 
@@ -181,7 +188,7 @@ describe('ConversationService', () => {
       providerId: null,
     })) as Record<string, string>
 
-    expect(env.ANTHROPIC_AUTH_TOKEN).toBeUndefined()
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined()
     expect(env.CLAUDE_CODE_ENTRYPOINT).toBe('claude-desktop')
     expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('forced-official-token')
   })
